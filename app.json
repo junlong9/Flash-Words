@@ -1,18 +1,19 @@
 {
   "expo": {
-    "name": "Word Flash",
-    "slug": "wordflash",
-    "scheme": "wordflash",
+    "name": "Lotus",
+    "slug": "lotus",
+    "scheme": "lotus",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.wordflash.app"
+      "bundleIdentifier": "com.lotus.wordoftheday"
     },
     "android": {
-      "package": "com.wordflash.app",
+      "package": "com.lotus.wordoftheday",
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",

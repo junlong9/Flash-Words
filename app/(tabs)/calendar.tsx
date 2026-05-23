@@ -7,13 +7,13 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import {
   addMonths,
   endOfMonth,
   format,
   getDay,
-  parseISO,
   startOfMonth,
   subMonths,
 } from 'date-fns';
@@ -38,7 +38,6 @@ export default function CalendarScreen() {
     queryFn: () => listFlashcards(user!.id),
   });
 
-  // Map of YYYY-MM-DD -> first card for that day
   const byDate = useMemo(() => {
     const map = new Map<string, FlashcardModel>();
     for (const c of cardsQ.data ?? []) {
@@ -51,15 +50,23 @@ export default function CalendarScreen() {
   const today = todayInTimezone();
 
   return (
-    <Screen scroll={false}>
+    <Screen scroll={false} hasTabBar>
       <Text style={styles.title}>Calendar</Text>
       <View style={styles.monthRow}>
-        <Pressable onPress={() => setCursor((d) => subMonths(d, 1))} style={styles.navBtn}>
-          <Text style={styles.navText}>‹</Text>
+        <Pressable
+          onPress={() => setCursor((d) => subMonths(d, 1))}
+          style={styles.navBtn}
+          hitSlop={8}
+        >
+          <Ionicons name="chevron-back" size={20} color={colors.text} />
         </Pressable>
         <Text style={styles.monthLabel}>{format(cursor, 'MMMM yyyy')}</Text>
-        <Pressable onPress={() => setCursor((d) => addMonths(d, 1))} style={styles.navBtn}>
-          <Text style={styles.navText}>›</Text>
+        <Pressable
+          onPress={() => setCursor((d) => addMonths(d, 1))}
+          style={styles.navBtn}
+          hitSlop={8}
+        >
+          <Ionicons name="chevron-forward" size={20} color={colors.text} />
         </Pressable>
       </View>
 
@@ -72,7 +79,7 @@ export default function CalendarScreen() {
       </View>
 
       {cardsQ.isLoading ? (
-        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xxl }} />
+        <ActivityIndicator color={colors.text} style={{ marginTop: spacing.xxl }} />
       ) : (
         <View style={styles.grid}>
           {days.map((d, i) => {
@@ -83,25 +90,21 @@ export default function CalendarScreen() {
             return (
               <Pressable
                 key={i}
-                style={[
-                  styles.cell,
-                  card ? styles.cellLogged : null,
-                  isToday ? styles.cellToday : null,
-                ]}
+                style={[styles.cell, isToday && styles.cellToday]}
                 onPress={() => card && setPicked(card)}
                 disabled={!card}
               >
-                <Text style={[styles.dayNum, card ? styles.dayNumLogged : null]}>
+                <Text style={[styles.dayNum, !card && styles.dayNumMuted]}>
                   {format(d, 'd')}
                 </Text>
-                {card ? <Text style={styles.leaf}>🌿</Text> : null}
+                {card ? <View style={styles.loggedDot} /> : null}
               </Pressable>
             );
           })}
         </View>
       )}
 
-      <Text style={styles.legend}>Tap any green day to revisit that day's flashcard.</Text>
+      <Text style={styles.legend}>Tap a marked day to review that word.</Text>
 
       <Modal visible={!!picked} transparent animationType="fade" onRequestClose={() => setPicked(null)}>
         <Pressable style={styles.scrim} onPress={() => setPicked(null)}>
@@ -131,30 +134,37 @@ function buildMonthGrid(date: Date): (Date | null)[] {
   return cells;
 }
 
-const CELL_GAP = 6;
+const CELL_GAP = 4;
 
 const styles = StyleSheet.create({
-  title: { fontSize: fontSizes.xxl, fontWeight: '800', color: colors.text, marginBottom: spacing.md },
+  title: {
+    fontSize: fontSizes.xl,
+    fontWeight: '500',
+    color: colors.primaryDark,
+    marginBottom: spacing.lg,
+    letterSpacing: -0.3,
+  },
   monthRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   navBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.bgAlt,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  navText: { fontSize: 22, color: colors.text, fontWeight: '600' },
-  monthLabel: { fontSize: fontSizes.lg, fontWeight: '700', color: colors.text },
+  monthLabel: {
+    fontSize: fontSizes.md,
+    fontWeight: '500',
+    color: colors.text,
+    letterSpacing: 0.2,
+  },
   weekHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 4,
     marginBottom: spacing.sm,
   },
   weekHeaderText: {
@@ -162,7 +172,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: colors.textMuted,
     fontSize: fontSizes.xs,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   grid: {
     flexDirection: 'row',
@@ -171,35 +181,40 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cell: {
-    width: `${100 / 7 - 1.6}%`,
+    width: `${100 / 7 - 1.2}%`,
     aspectRatio: 1,
-    borderRadius: radii.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cellLogged: {
-    backgroundColor: colors.primarySoft,
-    borderColor: colors.primary,
-  },
   cellToday: {
-    borderColor: colors.accent,
-    borderWidth: 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.primary,
+    borderRadius: radii.sm,
+    backgroundColor: colors.primarySoft,
   },
-  dayNum: { fontSize: fontSizes.sm, color: colors.text, fontWeight: '600' },
-  dayNumLogged: { color: colors.primaryDark },
-  leaf: { fontSize: 12, marginTop: 2 },
+  dayNum: {
+    fontSize: fontSizes.sm,
+    color: colors.text,
+    fontWeight: '400',
+  },
+  dayNumMuted: {
+    color: colors.textMuted,
+  },
+  loggedDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: colors.primary,
+    marginTop: 4,
+  },
   legend: {
     color: colors.textMuted,
     fontSize: fontSizes.xs,
-    textAlign: 'center',
     marginTop: spacing.lg,
   },
   scrim: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.lg,
@@ -210,5 +225,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
-  closeText: { color: '#fff', fontWeight: '600' },
+  closeText: { color: '#fff', fontWeight: '500', fontSize: fontSizes.sm },
 });

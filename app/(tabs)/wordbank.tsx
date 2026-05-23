@@ -1,16 +1,19 @@
-import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, View } from 'react-native';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Screen } from '@/components/Screen';
 import { TextField } from '@/components/TextField';
-import { Flashcard } from '@/components/Flashcard';
+import { WordBankItem } from '@/components/WordBankItem';
 import { useAuth } from '@/providers/AuthProvider';
-import { listFlashcards } from '@/lib/db';
+import { listFlashcards, removeFlashcard } from '@/lib/db';
+import type { Flashcard } from '@/lib/types';
 import { colors, fontSizes, spacing } from '@/theme/colors';
 
 export default function WordBankScreen() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   const cardsQ = useQuery({
     queryKey: ['flashcards', user?.id],
@@ -18,7 +21,20 @@ export default function WordBankScreen() {
     queryFn: () => listFlashcards(user!.id),
   });
 
-  const filtered = useMemo(() => {
+  const removeMutation = useMutation({
+    mutationFn: (cardId: string) => removeFlashcard(user!.id, cardId),
+    onMutate: (cardId) => setRemovingId(cardId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['flashcards', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
+    },
+    onError: () => {
+      Alert.alert('Could not remove', 'Please try again.');
+    },
+    onSettled: () => setRemovingId(null),
+  });
+
+  const filtered = React.useMemo(() => {
     const list = cardsQ.data ?? [];
     if (!search.trim()) return list;
     const q = search.trim().toLowerCase();
@@ -29,30 +45,34 @@ export default function WordBankScreen() {
     );
   }, [cardsQ.data, search]);
 
+  const count = cardsQ.data?.length ?? 0;
+
+  const handleRemove = (card: Flashcard) => {
+    removeMutation.mutate(card.id);
+  };
+
   return (
-    <Screen scroll={false}>
-      <Text style={styles.title}>Your Word Bank</Text>
-      <Text style={styles.subtitle}>
-        {cardsQ.data?.length ?? 0} {cardsQ.data?.length === 1 ? 'word' : 'words'} collected
-      </Text>
+    <Screen scroll={false} hasTabBar>
+      <View style={styles.header}>
+        <Text style={styles.title}>Words</Text>
+        <Text style={styles.subtitle}>{count} saved · tap trash to remove</Text>
+      </View>
 
       <TextField
         value={search}
         onChangeText={setSearch}
-        placeholder="Search words or definitions..."
+        placeholder="Search"
         autoCapitalize="none"
       />
 
       {cardsQ.isLoading ? (
         <View style={styles.center}>
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={colors.text} />
         </View>
       ) : filtered.length === 0 ? (
         <View style={styles.center}>
           <Text style={styles.empty}>
-            {search
-              ? 'No matches.'
-              : 'Your bank is empty. Add your first word from the Garden tab to get started.'}
+            {search ? 'No matches.' : 'No words yet. Add one from Garden.'}
           </Text>
         </View>
       ) : (
@@ -60,7 +80,13 @@ export default function WordBankScreen() {
           data={filtered}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingBottom: spacing.xxl, gap: spacing.md }}
-          renderItem={({ item }) => <Flashcard card={item} />}
+          renderItem={({ item }) => (
+            <WordBankItem
+              card={item}
+              onRemove={handleRemove}
+              removing={removingId === item.id}
+            />
+          )}
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -69,8 +95,28 @@ export default function WordBankScreen() {
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: fontSizes.xxl, fontWeight: '800', color: colors.text },
-  subtitle: { color: colors.textMuted, marginBottom: spacing.lg, marginTop: spacing.xs },
+  header: {
+    marginBottom: spacing.lg,
+    paddingBottom: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  title: {
+    fontSize: fontSizes.xl,
+    fontWeight: '500',
+    color: colors.primaryDark,
+    letterSpacing: -0.3,
+  },
+  subtitle: {
+    color: colors.textMuted,
+    marginTop: 2,
+    fontSize: fontSizes.sm,
+  },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  empty: { color: colors.textMuted, textAlign: 'center', fontSize: fontSizes.md, lineHeight: 22 },
+  empty: {
+    color: colors.textMuted,
+    textAlign: 'center',
+    fontSize: fontSizes.sm,
+    lineHeight: 20,
+  },
 });

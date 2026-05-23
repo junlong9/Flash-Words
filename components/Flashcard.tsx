@@ -6,14 +6,26 @@ import { prettyDate } from '@/lib/timezone';
 
 type Props = {
   card: FlashcardModel;
+  flipped?: boolean;
+  onFlip?: () => void;
+  showHint?: boolean;
 };
 
-export function Flashcard({ card }: Props) {
-  const [flipped, setFlipped] = useState(false);
+export function Flashcard({ card, flipped: controlledFlipped, onFlip, showHint = true }: Props) {
+  const [internalFlipped, setInternalFlipped] = useState(false);
+  const flipped = controlledFlipped ?? internalFlipped;
+
+  const handlePress = () => {
+    if (onFlip) onFlip();
+    else setInternalFlipped((v) => !v);
+  };
+
   return (
-    <Pressable onPress={() => setFlipped((v) => !v)} style={styles.card}>
+    <Pressable onPress={handlePress} style={styles.card}>
       {!flipped ? <Front card={card} /> : <Back card={card} />}
-      <Text style={styles.tapHint}>Tap to {flipped ? 'see word' : 'flip'}</Text>
+      {showHint ? (
+        <Text style={styles.tapHint}>{flipped ? 'Tap for word' : 'Tap for definition'}</Text>
+      ) : null}
     </Pressable>
   );
 }
@@ -26,7 +38,7 @@ function Front({ card }: { card: FlashcardModel }) {
       {card.phonetic ? <Text style={styles.phonetic}>{card.phonetic}</Text> : null}
       {card.part_of_speech ? (
         <View style={styles.posPill}>
-          <Text style={styles.posPillText}>{card.part_of_speech}</Text>
+          <Text style={styles.pos}>{card.part_of_speech}</Text>
         </View>
       ) : null}
     </View>
@@ -40,10 +52,10 @@ function Back({ card }: { card: FlashcardModel }) {
       <Text style={styles.smallWord}>{card.word}</Text>
       {card.definitions.map((d, i) => (
         <View key={i} style={{ marginTop: i === 0 ? spacing.xs : spacing.md }}>
-          <Text style={styles.def}>{i + 1}. {d.definition}</Text>
-          {d.example ? <Text style={styles.example}>“{d.example}”</Text> : null}
+          <Text style={styles.def}>{d.definition}</Text>
+          {d.example ? <Text style={styles.example}>{d.example}</Text> : null}
           {d.synonyms && d.synonyms.length > 0 ? (
-            <Text style={styles.synonyms}>Syn: {d.synonyms.join(', ')}</Text>
+            <Text style={styles.synonyms}>{d.synonyms.join(', ')}</Text>
           ) : null}
         </View>
       ))}
@@ -55,45 +67,56 @@ function Back({ card }: { card: FlashcardModel }) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.xl,
-    minHeight: 200,
-    borderWidth: 1,
+    borderRadius: radii.sm,
+    padding: spacing.lg,
+    minHeight: 160,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
   },
   faceFront: { alignItems: 'center', justifyContent: 'center', flex: 1 },
   faceBack: {},
-  dateLabel: { color: colors.textMuted, fontSize: fontSizes.xs, marginBottom: spacing.sm },
-  word: { fontSize: fontSizes.display, fontWeight: '700', color: colors.text, textAlign: 'center' },
-  phonetic: { fontSize: fontSizes.md, color: colors.textMuted, marginTop: spacing.xs },
+  dateLabel: {
+    color: colors.textMuted,
+    fontSize: fontSizes.xs,
+    marginBottom: spacing.sm,
+    letterSpacing: 0.3,
+  },
+  word: {
+    fontSize: fontSizes.xxl,
+    fontWeight: '400',
+    color: colors.text,
+    textAlign: 'center',
+    letterSpacing: -0.5,
+  },
+  phonetic: { fontSize: fontSizes.sm, color: colors.textMuted, marginTop: spacing.xs },
   posPill: {
     marginTop: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 4,
     backgroundColor: colors.primarySoft,
-    borderRadius: radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.sm,
   },
-  posPillText: { color: colors.primaryDark, fontSize: fontSizes.xs, fontWeight: '600' },
+  pos: {
+    fontSize: fontSizes.xs,
+    color: colors.primaryDark,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   smallWord: {
-    fontSize: fontSizes.lg,
-    fontWeight: '700',
-    color: colors.text,
+    fontSize: fontSizes.md,
+    fontWeight: '500',
+    color: colors.textMuted,
     marginBottom: spacing.sm,
   },
-  def: { fontSize: fontSizes.md, color: colors.text, lineHeight: 22 },
+  def: { fontSize: fontSizes.md, color: colors.text, lineHeight: 22, fontWeight: '400' },
   example: {
-    fontStyle: 'italic',
     color: colors.textMuted,
     marginTop: spacing.xs,
     fontSize: fontSizes.sm,
+    lineHeight: 20,
   },
   synonyms: {
-    color: colors.primaryDark,
+    color: colors.textMuted,
     fontSize: fontSizes.xs,
     marginTop: spacing.xs,
   },
@@ -102,5 +125,6 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.xs,
     textAlign: 'center',
     marginTop: spacing.md,
+    letterSpacing: 0.2,
   },
 });

@@ -54,19 +54,19 @@ export function Button({
 
 const styles = StyleSheet.create({
   base: {
-    height: 52,
-    borderRadius: radii.lg,
+    height: 44,
+    borderRadius: radii.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.lg,
   },
   fullWidth: { alignSelf: 'stretch' },
-  disabled: { opacity: 0.5 },
-  pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
+  disabled: { opacity: 0.4 },
+  pressed: { opacity: 0.7 },
   label: {
-    fontSize: fontSizes.md,
-    fontWeight: '600',
-    letterSpacing: 0.2,
+    fontSize: fontSizes.sm,
+    fontWeight: '500',
+    letterSpacing: 0.3,
   },
 });
 
@@ -78,7 +78,7 @@ const variantStyles: Record<Variant, { container: ViewStyle; label: { color: str
   secondary: {
     container: {
       backgroundColor: colors.surface,
-      borderWidth: 1,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.border,
     },
     label: { color: colors.text },

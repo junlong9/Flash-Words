@@ -1,30 +1,35 @@
 export const colors = {
-  bg: '#F4FAF6',
-  bgAlt: '#E8F3EC',
+  bg: '#F4F8F5',
+  bgAlt: '#E8F2EC',
   surface: '#FFFFFF',
-  border: '#D9E7DE',
+  border: '#D4E4DA',
 
-  text: '#0F1F18',
-  textMuted: '#5C6F66',
+  text: '#1B2E24',
+  textMuted: '#6B8578',
   textInverse: '#FFFFFF',
 
-  primary: '#2E9968',
-  primaryDark: '#1F7A50',
-  primarySoft: '#D6F0E1',
+  primary: '#3A7D5C',
+  primaryDark: '#2D6349',
+  primarySoft: '#E3F0E9',
+  primaryMuted: '#B8D4C4',
 
-  accent: '#F2B544',
-  danger: '#D9534F',
+  accent: '#7CB892',
+  danger: '#C0392B',
 
-  thirsty: '#C99E3A',
-  watered: '#2E9968',
-  wilted: '#A65A4A',
+  potLight: '#D4956A',
+  potDark: '#A66B45',
+  soil: '#5D4037',
+
+  thirsty: '#B8C98A',
+  watered: '#3A7D5C',
+  wilted: '#A8926E',
 };
 
 export const radii = {
-  sm: 8,
-  md: 12,
-  lg: 20,
-  xl: 28,
+  sm: 4,
+  md: 6,
+  lg: 8,
+  xl: 12,
   pill: 999,
 };
 
@@ -38,11 +43,14 @@ export const spacing = {
 };
 
 export const fontSizes = {
-  xs: 12,
-  sm: 14,
-  md: 16,
-  lg: 18,
-  xl: 22,
-  xxl: 28,
-  display: 36,
+  xs: 11,
+  sm: 13,
+  md: 15,
+  lg: 17,
+  xl: 20,
+  xxl: 24,
+  display: 28,
 };
+
+/** Base tab bar content height (excluding safe-area inset). */
+export const TAB_BAR_HEIGHT = 52;

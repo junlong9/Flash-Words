@@ -1,4 +1,4 @@
-# Word Flash 🌱
+# Lotus
 
 A gamified vocabulary-learning mobile app. Log a new word each day to "water" your virtual plant, build a streak, and grow a Word Bank you can review later.
 
@@ -11,7 +11,7 @@ Built with **Expo SDK 54 + React Native + TypeScript** on top of **Supabase** (A
 ## 1. Quick start
 
 ```bash
-cd wordflash
+cd lotus
 npm install --legacy-peer-deps   # if reinstalling
 cp .env.example .env             # then fill in your Supabase keys
 npm start
@@ -48,7 +48,7 @@ Restart `expo start` after editing `.env`.
 ## 3. Project layout
 
 ```
-wordflash/
+lotus/
 ├── app/                       # Expo Router routes
 │   ├── _layout.tsx            # Root providers + status bar
 │   ├── index.tsx              # Auth gate (redirects to (auth) or (tabs))

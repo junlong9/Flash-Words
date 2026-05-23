@@ -16,6 +16,11 @@ export type Flashcard = {
   is_manual: boolean;
   logged_date: string; // YYYY-MM-DD in user's tz
   created_at: string;
+  repetitions?: number;
+  interval_days?: number;
+  ease_factor?: number;
+  next_review_date?: string | null;
+  last_reviewed_at?: string | null;
 };
 
 export type Profile = {
@@ -27,6 +32,7 @@ export type Profile = {
   longest_streak: number;
   last_logged_date: string | null;
   total_words: number;
+  plant_growth_xp?: number;
   created_at: string;
   updated_at: string;
 };

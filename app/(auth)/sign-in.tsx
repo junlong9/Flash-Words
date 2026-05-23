@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
 import { Link } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { Button } from '@/components/Button';
@@ -30,8 +30,8 @@ export default function SignInScreen() {
     <Screen>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.hero}>
-          <Text style={styles.brand}>Word Flash</Text>
-          <Text style={styles.tagline}>Grow your vocabulary, one word a day.</Text>
+          <Text style={styles.brand}>Lotus</Text>
+          <Text style={styles.tagline}>One word a day.</Text>
         </View>
 
         <TextField
@@ -49,7 +49,7 @@ export default function SignInScreen() {
           autoCapitalize="none"
           value={password}
           onChangeText={setPassword}
-          placeholder="••••••••"
+          placeholder="Password"
         />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -59,7 +59,7 @@ export default function SignInScreen() {
         <View style={styles.footer}>
           <Text style={styles.footerText}>New here?</Text>
           <Link href="/(auth)/sign-up" style={styles.link}>
-            Create an account
+            Create account
           </Link>
         </View>
       </KeyboardAvoidingView>
@@ -68,19 +68,22 @@ export default function SignInScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: { alignItems: 'center', marginBottom: spacing.xxl, marginTop: spacing.xxl },
-  brand: { fontSize: fontSizes.display, fontWeight: '800', color: colors.primaryDark },
+  hero: { marginBottom: spacing.xxl, marginTop: spacing.xxl },
+  brand: {
+    fontSize: fontSizes.display,
+    fontWeight: '400',
+    color: colors.primaryDark,
+    letterSpacing: -0.5,
+  },
   tagline: {
-    fontSize: fontSizes.md,
+    fontSize: fontSizes.sm,
     color: colors.textMuted,
     marginTop: spacing.sm,
-    textAlign: 'center',
   },
   error: {
     color: colors.danger,
     fontSize: fontSizes.sm,
     marginBottom: spacing.md,
-    textAlign: 'center',
   },
   footer: {
     flexDirection: 'row',
@@ -89,6 +92,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
     gap: spacing.sm,
   },
-  footerText: { color: colors.textMuted },
-  link: { color: colors.primary, fontWeight: '600' },
+  footerText: { color: colors.textMuted, fontSize: fontSizes.sm },
+  link: { color: colors.primary, fontWeight: '500', fontSize: fontSizes.sm },
 });

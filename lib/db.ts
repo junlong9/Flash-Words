@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
 import { todayInTimezone } from './timezone';
 import { daysBetween } from './timezone';
+import { xpForWatering } from './plant';
+import type { ReviewSchedule } from './srs';
 import type { DefinitionEntry, Flashcard, Profile, FeaturedWord } from './types';
 
 // ---------- Profile ----------
@@ -87,6 +89,21 @@ export async function countFlashcardsOnDate(
   return count ?? 0;
 }
 
+export async function findFlashcardByWord(
+  userId: string,
+  word: string
+): Promise<Flashcard | null> {
+  const normalized = word.trim().toLowerCase();
+  const { data, error } = await supabase
+    .from('flashcards')
+    .select('*')
+    .eq('user_id', userId)
+    .ilike('word', normalized)
+    .limit(1);
+  if (error) throw error;
+  return ((data ?? [])[0] as Flashcard | undefined) ?? null;
+}
+
 export async function createFlashcard(input: NewFlashcardInput): Promise<Flashcard> {
   const { data, error } = await supabase
     .from('flashcards')
@@ -111,18 +128,58 @@ export async function deleteFlashcard(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Remove a flashcard and decrement the user's word count (plant XP is kept). */
+export async function removeFlashcard(userId: string, cardId: string): Promise<void> {
+  const { error } = await supabase
+    .from('flashcards')
+    .delete()
+    .eq('id', cardId)
+    .eq('user_id', userId);
+  if (error) throw error;
+
+  const profile = await fetchProfile(userId);
+  if (profile && profile.total_words > 0) {
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ total_words: profile.total_words - 1 })
+      .eq('id', userId);
+    if (profileError) throw profileError;
+  }
+}
+
+export async function submitReview(
+  userId: string,
+  cardId: string,
+  schedule: ReviewSchedule
+): Promise<Flashcard> {
+  const { data, error } = await supabase
+    .from('flashcards')
+    .update({
+      repetitions: schedule.repetitions,
+      interval_days: schedule.interval_days,
+      ease_factor: schedule.ease_factor,
+      next_review_date: schedule.next_review_date,
+      last_reviewed_at: schedule.last_reviewed_at,
+    })
+    .eq('id', cardId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Flashcard;
+}
+
 // ---------- Streak / profile recompute ----------
 
 /**
- * Apply streak + total_words updates after a flashcard was logged today.
- * - If last_logged_date == today, streak unchanged (multi-cards same day).
- * - If last_logged_date == yesterday, streak += 1.
- * - Otherwise, streak resets to 1.
+ * Apply streak, word count, and growth XP after a flashcard was logged today.
+ * First word of the day earns full XP; additional words earn reduced XP.
  */
 export async function applyDailyLogToProfile(
   userId: string,
-  todayLocal: string
-): Promise<Profile> {
+  todayLocal: string,
+  cardsTodayBefore: number
+): Promise<{ profile: Profile; xpGained: number }> {
   const profile = await fetchProfile(userId);
   if (!profile) throw new Error('Profile missing.');
 
@@ -137,6 +194,8 @@ export async function applyDailyLogToProfile(
   }
 
   const longest = Math.max(profile.longest_streak, newStreak);
+  const xpGained = xpForWatering(cardsTodayBefore);
+  const newGrowthXp = Number(profile.plant_growth_xp ?? 0) + xpGained;
 
   const { data, error } = await supabase
     .from('profiles')
@@ -145,12 +204,41 @@ export async function applyDailyLogToProfile(
       longest_streak: longest,
       last_logged_date: todayLocal,
       total_words: profile.total_words + 1,
+      plant_growth_xp: newGrowthXp,
     })
     .eq('id', userId)
     .select()
     .single();
   if (error) throw error;
+  return { profile: data as Profile, xpGained };
+}
+
+/** Dev-only: add growth XP without creating a flashcard. */
+export async function addDevGrowthXp(userId: string, xp: number): Promise<Profile> {
+  const profile = await fetchProfile(userId);
+  if (!profile) throw new Error('Profile missing.');
+  const newGrowthXp = Number(profile.plant_growth_xp ?? 0) + xp;
+  return setDevGrowthXp(userId, newGrowthXp);
+}
+
+/** Dev-only: set growth XP to an exact value (stage preview). */
+export async function setDevGrowthXp(userId: string, xp: number): Promise<Profile> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ plant_growth_xp: Math.max(0, xp) })
+    .eq('id', userId)
+    .select()
+    .single();
+  if (error) throw error;
   return data as Profile;
+}
+
+/** Dev-only: subtract growth XP (clamped at 0). */
+export async function subtractDevGrowthXp(userId: string, xp: number): Promise<Profile> {
+  const profile = await fetchProfile(userId);
+  if (!profile) throw new Error('Profile missing.');
+  const current = Number(profile.plant_growth_xp ?? 0);
+  return setDevGrowthXp(userId, Math.max(0, current - xp));
 }
 
 // ---------- Featured Words ----------

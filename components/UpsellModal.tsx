@@ -43,6 +43,6 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     gap: spacing.md,
   },
-  title: { fontSize: fontSizes.xl, fontWeight: '700', color: colors.text },
+  title: { fontSize: fontSizes.lg, fontWeight: '500', color: colors.text },
   body: { fontSize: fontSizes.md, color: colors.textMuted, lineHeight: 22 },
 });

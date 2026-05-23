@@ -1,132 +1,190 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View } from 'react-native';
-import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Ellipse, G, Line, Path, Rect } from 'react-native-svg';
 import type { PlantHydration, PlantStage } from '@/lib/types';
 import { colors } from '@/theme/colors';
 
-type Props = {
+export type PlantProps = {
   stage: PlantStage;
   hydration: PlantHydration;
   size?: number;
+  foliageScale?: number;
 };
 
-/**
- * A simple, illustrative SVG plant whose visuals scale by stage and shift hue by hydration.
- */
-export function Plant({ stage, hydration, size = 220 }: Props) {
-  const palette = palettes[hydration];
-  const droop = hydration === 'wilted' ? 'wilt' : hydration === 'thirsty' ? 'thirsty' : 'fresh';
+/** Soft flat palette for a familiar potted houseplant. */
+type PlantPalette = {
+  pot: string;
+  potRim: string;
+  soil: string;
+  leaf: string;
+  leafDark: string;
+  stem: string;
+};
+
+const ANCHOR_X = 110;
+const ANCHOR_Y = 126;
+
+export function Plant({ stage, hydration, size = 240, foliageScale = 1 }: PlantProps) {
+  const palette = useMemo(() => getPlantPalette(hydration), [hydration]);
 
   return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'flex-end' }}>
-      <Svg width={size} height={size} viewBox="0 0 200 200">
-        <Defs>
-          <LinearGradient id="pot" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#C99166" />
-            <Stop offset="1" stopColor="#8E5A37" />
-          </LinearGradient>
-          <LinearGradient id="leaf" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={palette.leafLight} />
-            <Stop offset="1" stopColor={palette.leafDark} />
-          </LinearGradient>
-        </Defs>
+    <View
+      style={{
+        width: size,
+        height: size * 0.92,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F5F4F0',
+        borderRadius: 12,
+      }}
+    >
+      <Svg width={size} height={size * 0.92} viewBox="0 0 220 200">
+        <PlantPot palette={palette} />
 
-        {/* Pot */}
-        <Path
-          d="M55 150 L145 150 L138 188 Q100 196 62 188 Z"
-          fill="url(#pot)"
-        />
-        <Rect x="50" y="142" width="100" height="12" rx="3" fill="#7A4A2C" />
-        {/* Soil */}
-        <Ellipse cx="100" cy="148" rx="48" ry="6" fill="#3F2A1B" />
-
-        {renderStage(stage, droop)}
+        <G
+          transform={`translate(${ANCHOR_X}, ${ANCHOR_Y}) scale(${foliageScale}) translate(${-ANCHOR_X}, ${-ANCHOR_Y})`}
+        >
+          <HousePlant palette={palette} stage={stage} />
+        </G>
       </Svg>
     </View>
   );
 }
 
-function renderStage(stage: PlantStage, droop: 'fresh' | 'thirsty' | 'wilt') {
-  switch (stage) {
-    case 'seed':
-      return (
+function PlantPot({ palette }: { palette: PlantPalette }) {
+  return (
+    <>
+      <Path d="M76 126 H144 L136 170 H84 Z" fill={palette.pot} />
+      <Rect x="72" y="118" width="76" height="14" rx="3" fill={palette.potRim} />
+      <Ellipse cx="110" cy="126" rx="31" ry="5" fill={palette.soil} />
+    </>
+  );
+}
+
+function HousePlant({ palette, stage }: { palette: PlantPalette; stage: PlantStage }) {
+  if (stage === 'seed') {
+    return (
+      <>
+        <Circle cx="105" cy="122" r="3" fill={palette.soil} />
+        <Circle cx="113" cy="121" r="2.5" fill={palette.soil} />
+      </>
+    );
+  }
+
+  const leafCount = stage === 'seedling' ? 2 : stage === 'sprout' ? 4 : 6;
+  const isTall = stage === 'young_tree' || stage === 'mature_tree';
+  const isFull = stage === 'mature_tree';
+
+  return (
+    <>
+      <Line
+        x1="110"
+        y1="126"
+        x2="110"
+        y2={isTall ? 62 : 88}
+        stroke={palette.stem}
+        strokeWidth={isTall ? 5 : 3}
+        strokeLinecap="round"
+      />
+
+      {leafCount >= 2 && (
         <>
-          <Ellipse cx="100" cy="146" rx="6" ry="4" fill="#5C3A22" />
+          <Leaf cx={94} cy={112} rx={20} ry={10} rotate={-32} palette={palette} />
+          <Leaf cx={126} cy={110} rx={20} ry={10} rotate={32} palette={palette} />
         </>
-      );
-    case 'seedling':
-      return (
+      )}
+      {leafCount >= 4 && (
         <>
-          <Path
-            d={droop === 'wilt' ? 'M100 146 Q104 138 110 138' : 'M100 146 Q98 132 92 130'}
-            stroke={leaf('leafDark', droop)}
-            strokeWidth={3}
-            strokeLinecap="round"
-            fill="none"
-          />
-          <Ellipse cx={droop === 'wilt' ? 112 : 90} cy={droop === 'wilt' ? 138 : 128} rx="9" ry="5" fill="url(#leaf)" />
-          <Ellipse cx="100" cy="146" rx="5" ry="3" fill="#5C3A22" />
+          <Leaf cx={88} cy={92} rx={23} ry={11} rotate={-24} palette={palette} dark />
+          <Leaf cx={132} cy={91} rx={23} ry={11} rotate={24} palette={palette} />
         </>
-      );
-    case 'sprout':
-      return (
+      )}
+      {leafCount >= 6 && (
         <>
-          <Path d="M100 146 L100 110" stroke={leaf('leafDark', droop)} strokeWidth={3} strokeLinecap="round" />
-          <Ellipse cx={droop === 'wilt' ? 90 : 86} cy={droop === 'wilt' ? 124 : 120} rx="14" ry="7" fill="url(#leaf)" transform={`rotate(${droop === 'wilt' ? 30 : -25} 86 120)`} />
-          <Ellipse cx={droop === 'wilt' ? 110 : 114} cy={droop === 'wilt' ? 124 : 116} rx="14" ry="7" fill="url(#leaf)" transform={`rotate(${droop === 'wilt' ? -30 : 25} 114 116)`} />
-          <Ellipse cx="100" cy="106" rx="9" ry="6" fill="url(#leaf)" />
+          <Leaf cx={100} cy={74} rx={22} ry={10} rotate={-48} palette={palette} />
+          <Leaf cx={122} cy={73} rx={22} ry={10} rotate={48} palette={palette} dark />
         </>
-      );
-    case 'sapling':
-      return (
-        <>
-          <Path d="M100 146 L100 90" stroke="#6B4324" strokeWidth={5} strokeLinecap="round" />
-          <Path d="M100 118 Q80 110 72 100" stroke="#6B4324" strokeWidth={3} strokeLinecap="round" fill="none" />
-          <Path d="M100 110 Q120 102 130 92" stroke="#6B4324" strokeWidth={3} strokeLinecap="round" fill="none" />
-          <Circle cx="100" cy="84" r="22" fill="url(#leaf)" />
-          <Circle cx="76" cy="96" r="13" fill="url(#leaf)" />
-          <Circle cx="128" cy="88" r="14" fill="url(#leaf)" />
-        </>
-      );
-    case 'young_tree':
-      return (
-        <>
-          <Path d="M100 146 L100 76" stroke="#5E3818" strokeWidth={7} strokeLinecap="round" />
-          <Path d="M100 110 Q72 100 60 84" stroke="#5E3818" strokeWidth={4} strokeLinecap="round" fill="none" />
-          <Path d="M100 100 Q130 90 144 72" stroke="#5E3818" strokeWidth={4} strokeLinecap="round" fill="none" />
-          <Circle cx="100" cy="68" r="30" fill="url(#leaf)" />
-          <Circle cx="68" cy="80" r="18" fill="url(#leaf)" />
-          <Circle cx="138" cy="68" r="18" fill="url(#leaf)" />
-          <Circle cx="120" cy="50" r="14" fill="url(#leaf)" />
-        </>
-      );
-    case 'mature_tree':
-      return (
-        <>
-          <Path d="M100 146 L100 70" stroke="#4A2C12" strokeWidth={9} strokeLinecap="round" />
-          <Path d="M100 110 Q66 96 52 76" stroke="#4A2C12" strokeWidth={5} strokeLinecap="round" fill="none" />
-          <Path d="M100 100 Q138 86 154 64" stroke="#4A2C12" strokeWidth={5} strokeLinecap="round" fill="none" />
-          <Circle cx="100" cy="58" r="36" fill="url(#leaf)" />
-          <Circle cx="56" cy="72" r="22" fill="url(#leaf)" />
-          <Circle cx="146" cy="60" r="22" fill="url(#leaf)" />
-          <Circle cx="116" cy="36" r="18" fill="url(#leaf)" />
-          <Circle cx="80" cy="40" r="14" fill="url(#leaf)" />
-        </>
-      );
+      )}
+      {isTall && (
+        <Leaf
+          cx={110}
+          cy={58}
+          rx={isFull ? 24 : 18}
+          ry={isFull ? 12 : 9}
+          rotate={-90}
+          palette={palette}
+        />
+      )}
+    </>
+  );
+}
+
+function Leaf({
+  cx,
+  cy,
+  rx,
+  ry,
+  rotate,
+  palette,
+  dark,
+}: {
+  cx: number;
+  cy: number;
+  rx: number;
+  ry: number;
+  rotate: number;
+  palette: PlantPalette;
+  dark?: boolean;
+}) {
+  const fill = dark ? palette.leafDark : palette.leaf;
+  return (
+    <G transform={`rotate(${rotate} ${cx} ${cy})`}>
+      <Ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill={fill} />
+      <Line
+        x1={cx - rx * 0.65}
+        y1={cy}
+        x2={cx + rx * 0.65}
+        y2={cy}
+        stroke={palette.stem}
+        strokeWidth={1}
+        strokeLinecap="round"
+        opacity={0.45}
+      />
+    </G>
+  );
+}
+
+function getPlantPalette(hydration: PlantHydration): PlantPalette {
+  switch (hydration) {
+    case 'watered':
+      return {
+        pot: '#B86F45',
+        potRim: '#D18A5F',
+        soil: '#5A3B2E',
+        leaf: '#4F9A64',
+        leafDark: '#3E7F53',
+        stem: '#3F7A4D',
+      };
+    case 'thirsty':
+      return {
+        pot: '#B9825D',
+        potRim: '#D2A07F',
+        soil: '#6B4A3D',
+        leaf: '#8FA66F',
+        leafDark: '#788E5E',
+        stem: '#6F8359',
+      };
+    case 'wilted':
+      return {
+        pot: '#A7795D',
+        potRim: '#BD9278',
+        soil: '#6D5549',
+        leaf: '#A59A72',
+        leafDark: '#8D835F',
+        stem: '#7F7657',
+      };
   }
 }
-
-function leaf(_kind: string, droop: 'fresh' | 'thirsty' | 'wilt') {
-  if (droop === 'wilt') return '#8B6E3F';
-  if (droop === 'thirsty') return '#7C9E54';
-  return '#5BA86F';
-}
-
-const palettes: Record<PlantHydration, { leafLight: string; leafDark: string }> = {
-  watered: { leafLight: '#7CD9A0', leafDark: '#2E9968' },
-  thirsty: { leafLight: '#C0D88A', leafDark: '#7C9E54' },
-  wilted:  { leafLight: '#B49B66', leafDark: '#7A6539' },
-};
 
 export const STATUS_COLOR: Record<PlantHydration, string> = {
   watered: colors.watered,

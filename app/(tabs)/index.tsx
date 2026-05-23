@@ -2,10 +2,10 @@ import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -15,7 +15,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Screen } from '@/components/Screen';
 import { Button } from '@/components/Button';
 import { TextField } from '@/components/TextField';
-import { Plant, STATUS_COLOR, STATUS_LABEL } from '@/components/Plant';
+import { AnimatedPlant } from '@/components/AnimatedPlant';
+import { Flashcard } from '@/components/Flashcard';
+import { STATUS_COLOR, STATUS_LABEL } from '@/components/Plant';
 import { UpsellModal } from '@/components/UpsellModal';
 import { useAuth } from '@/providers/AuthProvider';
 import {
@@ -23,13 +25,19 @@ import {
   countFlashcardsOnDate,
   createFlashcard,
   fetchProfile,
+  findFlashcardByWord,
   getFeaturedWordForDate,
   setPremium,
 } from '@/lib/db';
-import { lookupWord, DictionaryNotFoundError } from '@/lib/dictionary';
+import { lookupWord, suggestWord, DictionaryNotFoundError } from '@/lib/dictionary';
 import { detectTimezone, todayInTimezone } from '@/lib/timezone';
-import { plantStateFor, PLANT_STAGE_LABELS } from '@/lib/plant';
-import type { DefinitionEntry } from '@/lib/types';
+import {
+  GROWTH_XP_FIRST_DAILY,
+  GROWTH_XP_REPEAT_DAILY,
+  PLANT_STAGE_LABELS,
+  plantStateFor,
+} from '@/lib/plant';
+import type { DefinitionEntry, Flashcard as FlashcardModel } from '@/lib/types';
 import { colors, fontSizes, radii, spacing } from '@/theme/colors';
 
 export default function GardenScreen() {
@@ -43,6 +51,12 @@ export default function GardenScreen() {
   const [manualDefinition, setManualDefinition] = useState('');
   const [pendingWord, setPendingWord] = useState<string | null>(null);
   const [upsellVisible, setUpsellVisible] = useState(false);
+  const [waterPulse, setWaterPulse] = useState(0);
+  const [rewindPulse, setRewindPulse] = useState(0);
+  const [lastXpDelta, setLastXpDelta] = useState<number | null>(null);
+  const [lastSavedCard, setLastSavedCard] = useState<FlashcardModel | null>(null);
+  const [savedModalVisible, setSavedModalVisible] = useState(false);
+  const [suggestedWord, setSuggestedWord] = useState<string | null>(null);
 
   const profileQ = useQuery({
     queryKey: ['profile', user?.id],
@@ -60,14 +74,16 @@ export default function GardenScreen() {
     queryFn: () => countFlashcardsOnDate(user!.id, today),
   });
 
+  const growthXp = Number(profile?.plant_growth_xp ?? profile?.total_words ?? 0);
+
   const plant = useMemo(
     () =>
       plantStateFor({
-        totalWords: profile?.total_words ?? 0,
+        growthXp,
         lastLoggedDate: profile?.last_logged_date ?? null,
         timezone: tz,
       }),
-    [profile?.total_words, profile?.last_logged_date, tz]
+    [growthXp, profile?.last_logged_date, tz]
   );
 
   const todayCount = todayCountQ.data ?? 0;
@@ -76,6 +92,8 @@ export default function GardenScreen() {
   async function handleSubmit(useFeatured = false) {
     if (!user || !profile) return;
     setError(null);
+    setSuggestedWord(null);
+    Keyboard.dismiss();
 
     let toLog = word.trim();
     let source: 'dictionary_api' | 'featured' = 'dictionary_api';
@@ -102,24 +120,60 @@ export default function GardenScreen() {
 
     setSubmitting(true);
     try {
-      const lookup = await lookupWord(toLog);
-      await persistAndRefresh({
-        word: lookup.word,
-        phonetic: lookup.phonetic,
-        partOfSpeech: lookup.partOfSpeech,
-        definitions: lookup.definitions,
-        source,
-        isManual: false,
-      });
-      setWord('');
+      const saved = await lookupAndSaveWord(toLog, source);
+      if (saved) setWord('');
     } catch (err: any) {
       if (err instanceof DictionaryNotFoundError) {
+        const suggestion = await suggestWord(err.word);
+        if (suggestion) {
+          setPendingWord(err.word);
+          setSuggestedWord(suggestion);
+          setError(null);
+          return;
+        }
         setPendingWord(err.word);
         setShowManual(true);
         setError(null);
       } else {
         setError(err?.message ?? 'Something went wrong.');
       }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function lookupAndSaveWord(
+    toLog: string,
+    source: 'dictionary_api' | 'featured'
+  ): Promise<FlashcardModel | null> {
+    const lookup = await lookupWord(toLog);
+    return persistAndRefresh({
+      word: lookup.word,
+      phonetic: lookup.phonetic,
+      partOfSpeech: lookup.partOfSpeech,
+      definitions: lookup.definitions,
+      source,
+      isManual: false,
+    });
+  }
+
+  async function handleUseSuggestion() {
+    if (!suggestedWord) return;
+    const wordToUse = suggestedWord;
+    setSuggestedWord(null);
+    setError(null);
+    setSubmitting(true);
+    try {
+      const saved = await lookupAndSaveWord(wordToUse, 'dictionary_api');
+      if (saved) {
+        setWord('');
+        setPendingWord(null);
+      } else {
+        setWord(wordToUse);
+      }
+    } catch (err: any) {
+      Alert.alert('Save failed', err?.message ?? 'Try again.');
+      setWord(wordToUse);
     } finally {
       setSubmitting(false);
     }
@@ -133,7 +187,7 @@ export default function GardenScreen() {
     }
     setSubmitting(true);
     try {
-      await persistAndRefresh({
+      const saved = await persistAndRefresh({
         word: pendingWord,
         phonetic: null,
         partOfSpeech: null,
@@ -141,10 +195,12 @@ export default function GardenScreen() {
         source: 'dictionary_api',
         isManual: true,
       });
-      setShowManual(false);
-      setManualDefinition('');
-      setPendingWord(null);
-      setWord('');
+      if (saved) {
+        setShowManual(false);
+        setManualDefinition('');
+        setPendingWord(null);
+        setWord('');
+      }
     } catch (err: any) {
       Alert.alert('Save failed', err?.message ?? 'Try again.');
     } finally {
@@ -159,11 +215,19 @@ export default function GardenScreen() {
     definitions: DefinitionEntry[];
     source: 'dictionary_api' | 'featured';
     isManual: boolean;
-  }) {
-    if (!user) return;
-    await createFlashcard({
+  }): Promise<FlashcardModel | null> {
+    if (!user) return null;
+    const normalizedWord = args.word.trim().toLowerCase();
+    const existing = await findFlashcardByWord(user.id, normalizedWord);
+    if (existing) {
+      Alert.alert('Already saved', `"${existing.word}" is already in your word bank.`);
+      return null;
+    }
+
+    const cardsTodayBefore = todayCount;
+    const createdCard = await createFlashcard({
       userId: user.id,
-      word: args.word.toLowerCase(),
+      word: normalizedWord,
       phonetic: args.phonetic,
       partOfSpeech: args.partOfSpeech,
       definitions: args.definitions,
@@ -171,44 +235,136 @@ export default function GardenScreen() {
       isManual: args.isManual,
       loggedDate: today,
     });
-    await applyDailyLogToProfile(user.id, today);
+    setLastSavedCard(createdCard);
+    setSavedModalVisible(true);
+    const { xpGained } = await applyDailyLogToProfile(user.id, today, cardsTodayBefore);
+    setLastXpDelta(xpGained);
+    setWaterPulse((n) => n + 1);
     await Promise.all([
       qc.invalidateQueries({ queryKey: ['profile', user.id] }),
       qc.invalidateQueries({ queryKey: ['todayCount', user.id, today] }),
       qc.invalidateQueries({ queryKey: ['flashcards', user.id] }),
     ]);
+    return createdCard;
   }
 
   if (profileQ.isLoading) {
     return (
-      <Screen>
+      <Screen hasTabBar>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.text} />
         </View>
       </Screen>
     );
   }
 
   return (
-    <Screen>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <Screen hasTabBar contentStyle={styles.screenContent}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardWrap}
+      >
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.greeting}>Hi {profile?.display_name ?? 'there'} 👋</Text>
-            <Text style={styles.subGreeting}>Today is {today}</Text>
+            <Text style={styles.greeting}>{profile?.display_name ?? 'Guest'}</Text>
+            <Text style={styles.subGreeting}>{today}</Text>
           </View>
           <View style={styles.streakBadge}>
             <Text style={styles.streakNumber}>{profile?.current_streak ?? 0}</Text>
-            <Text style={styles.streakLabel}>day streak</Text>
+            <Text style={styles.streakLabel}>streak</Text>
           </View>
         </View>
 
+        <View style={styles.inputCard}>
+          <Text style={styles.inputTitle}>What word did you learn today?</Text>
+          <TextField
+            value={word}
+            onChangeText={(value) => {
+              setWord(value);
+              setSuggestedWord(null);
+            }}
+            placeholder=""
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="done"
+            onSubmitEditing={() => handleSubmit(false)}
+            error={error}
+          />
+          {suggestedWord ? (
+            <View style={styles.suggestionBox}>
+              <Text style={styles.suggestionText}>
+                Did you mean <Text style={styles.suggestionWord}>{suggestedWord}</Text>?
+              </Text>
+              <View style={styles.suggestionActions}>
+                <Button
+                  title="Use it"
+                  onPress={handleUseSuggestion}
+                  loading={submitting}
+                  fullWidth={false}
+                  style={styles.suggestionButton}
+                />
+                <Button
+                  title="Add manually"
+                  variant="secondary"
+                  onPress={() => {
+                    setSuggestedWord(null);
+                    setShowManual(true);
+                  }}
+                  disabled={submitting}
+                  fullWidth={false}
+                  style={styles.suggestionButton}
+                />
+              </View>
+            </View>
+          ) : null}
+          <Button
+            title={canLogToday ? 'Add word' : 'Daily limit reached'}
+            onPress={() => handleSubmit(false)}
+            loading={submitting}
+          />
+          <Button
+            title="Featured word"
+            variant="ghost"
+            onPress={() => handleSubmit(true)}
+            disabled={submitting}
+          />
+          {!canLogToday ? (
+            <Text style={styles.dailyDone}>
+              You've watered your plant today. Free tier is 1 card/day.
+            </Text>
+          ) : null}
+        </View>
+
         <View style={styles.card}>
-          <View style={[styles.statusPill, { backgroundColor: STATUS_COLOR[plant.hydration] }]}>
-            <Text style={styles.statusText}>{STATUS_LABEL[plant.hydration]}</Text>
+          <View style={styles.statusRow}>
+            <View style={[styles.statusDot, { backgroundColor: STATUS_COLOR[plant.hydration] }]} />
+            <Text style={[styles.statusText, { color: STATUS_COLOR[plant.hydration] }]}>
+              {STATUS_LABEL[plant.hydration]}
+            </Text>
           </View>
-          <Plant stage={plant.stage} hydration={plant.hydration} size={240} />
+
+          <View style={styles.plantFrame}>
+            <AnimatedPlant
+              stage={plant.stage}
+              hydration={plant.hydration}
+              foliageScale={plant.foliageScale}
+              waterPulse={waterPulse}
+              rewindPulse={rewindPulse}
+              size={240}
+            />
+          </View>
           <Text style={styles.stageLabel}>{PLANT_STAGE_LABELS[plant.stage]}</Text>
+          {lastXpDelta !== null ? (
+            <Text
+              style={[
+                styles.xpGain,
+                lastXpDelta < 0 ? styles.xpLoss : null,
+              ]}
+            >
+              {lastXpDelta >= 0 ? '+' : ''}
+              {lastXpDelta.toFixed(2)} growth
+            </Text>
+          ) : null}
 
           <View style={styles.progressBar}>
             <View
@@ -220,38 +376,14 @@ export default function GardenScreen() {
           </View>
           <Text style={styles.progressText}>
             {plant.nextStageAt
-              ? `${profile?.total_words ?? 0} / ${plant.nextStageAt} words to next stage`
-              : 'Maximum stage reached!'}
+              ? `${plant.growthXp.toFixed(1)} / ${plant.nextStageAt} XP · next: ${plant.nextStageLabel ? PLANT_STAGE_LABELS[plant.nextStageLabel] : ''}`
+              : `${plant.growthXp.toFixed(1)} XP · fully grown`}
+          </Text>
+          <Text style={styles.xpHint}>
+            First word today: +{GROWTH_XP_FIRST_DAILY} XP · extra words: +{GROWTH_XP_REPEAT_DAILY} XP
           </Text>
         </View>
 
-        <View style={styles.inputCard}>
-          <Text style={styles.inputTitle}>What word did you learn today?</Text>
-          <TextField
-            value={word}
-            onChangeText={setWord}
-            placeholder="e.g. serendipity"
-            autoCapitalize="none"
-            autoCorrect={false}
-            error={error}
-          />
-          <Button
-            title={canLogToday ? 'Water my plant' : 'Daily limit — Upgrade'}
-            onPress={() => handleSubmit(false)}
-            loading={submitting}
-          />
-          <Button
-            title="Don't have a word? Get today's featured word"
-            variant="ghost"
-            onPress={() => handleSubmit(true)}
-            disabled={submitting}
-          />
-          {!canLogToday ? (
-            <Text style={styles.dailyDone}>
-              You've watered your plant today. Free tier is 1 card/day.
-            </Text>
-          ) : null}
-        </View>
       </KeyboardAvoidingView>
 
       <Modal
@@ -288,6 +420,21 @@ export default function GardenScreen() {
         </View>
       </Modal>
 
+      <Modal
+        visible={savedModalVisible && !!lastSavedCard}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSavedModalVisible(false)}
+      >
+        <View style={styles.modalScrim}>
+          <View style={styles.savedModalSheet}>
+            <Text style={styles.modalTitle}>Word added</Text>
+            {lastSavedCard ? <Flashcard card={lastSavedCard} /> : null}
+            <Button title="Done" onPress={() => setSavedModalVisible(false)} />
+          </View>
+        </View>
+      </Modal>
+
       <UpsellModal
         visible={upsellVisible}
         onClose={() => setUpsellVisible(false)}
@@ -304,52 +451,89 @@ export default function GardenScreen() {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  screenContent: { flexGrow: 1 },
+  keyboardWrap: { flex: 1 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 200 },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
+    alignItems: 'flex-end',
+    marginBottom: spacing.xl,
+    paddingBottom: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
-  greeting: { fontSize: fontSizes.xl, fontWeight: '700', color: colors.text },
-  subGreeting: { color: colors.textMuted, marginTop: 2 },
-  streakBadge: {
-    backgroundColor: colors.primarySoft,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.lg,
-    alignItems: 'center',
-  },
-  streakNumber: { fontSize: fontSizes.xl, fontWeight: '800', color: colors.primaryDark },
-  streakLabel: { fontSize: 10, color: colors.primaryDark, fontWeight: '600' },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  statusPill: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 4,
-    borderRadius: radii.pill,
-    marginBottom: spacing.sm,
-  },
-  statusText: { color: '#fff', fontWeight: '700', fontSize: fontSizes.xs, letterSpacing: 0.5 },
-  stageLabel: {
-    fontSize: fontSizes.lg,
-    fontWeight: '700',
+  greeting: {
+    fontSize: fontSizes.xl,
+    fontWeight: '500',
     color: colors.text,
+    letterSpacing: -0.3,
+  },
+  subGreeting: {
+    color: colors.textMuted,
+    marginTop: 2,
+    fontSize: fontSizes.sm,
+  },
+  streakBadge: {
+    alignItems: 'flex-end',
+  },
+  streakNumber: {
+    fontSize: fontSizes.xxl,
+    fontWeight: '300',
+    color: colors.primaryDark,
+    letterSpacing: -0.5,
+  },
+  streakLabel: {
+    fontSize: fontSizes.xs,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  card: {
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    marginBottom: spacing.xl,
+  },
+  plantFrame: {
+    width: '100%',
+    alignItems: 'center',
+    backgroundColor: '#F5F4F0',
+    borderRadius: radii.xl,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.sm,
+    overflow: 'hidden',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusText: {
+    fontWeight: '500',
+    fontSize: fontSizes.xs,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  stageLabel: {
+    fontSize: fontSizes.sm,
+    fontWeight: '500',
+    color: colors.primaryDark,
     marginTop: spacing.sm,
+    letterSpacing: 0.3,
   },
   progressBar: {
-    height: 8,
+    height: 2,
     width: '100%',
-    backgroundColor: colors.bgAlt,
-    borderRadius: radii.pill,
-    marginTop: spacing.md,
+    backgroundColor: colors.border,
+    marginTop: spacing.lg,
     overflow: 'hidden',
   },
   progressFill: { height: '100%', backgroundColor: colors.primary },
@@ -357,21 +541,57 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.xs,
     color: colors.textMuted,
     marginTop: spacing.sm,
+    textAlign: 'center',
+  },
+  xpGain: {
+    fontSize: fontSizes.sm,
+    color: colors.primary,
+    fontWeight: '500',
+    marginTop: spacing.xs,
+  },
+  xpLoss: {
+    color: colors.textMuted,
+  },
+  xpHint: {
+    fontSize: fontSizes.xs,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+    textAlign: 'center',
+    opacity: 0.85,
   },
   inputCard: {
+    gap: spacing.sm,
+    marginBottom: spacing.xl,
+  },
+  suggestionBox: {
     backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    padding: spacing.lg,
-    marginTop: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: radii.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.primaryMuted,
+    padding: spacing.md,
     gap: spacing.sm,
   },
-  inputTitle: {
-    fontSize: fontSizes.md,
-    fontWeight: '700',
+  suggestionText: {
+    fontSize: fontSizes.sm,
     color: colors.text,
-    marginBottom: spacing.sm,
+  },
+  suggestionWord: {
+    color: colors.primaryDark,
+    fontWeight: '600',
+  },
+  suggestionActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  suggestionButton: {
+    flex: 1,
+  },
+  inputTitle: {
+    fontSize: fontSizes.sm,
+    fontWeight: '500',
+    color: colors.textMuted,
+    marginBottom: spacing.xs,
+    letterSpacing: 0.2,
   },
   dailyDone: {
     color: colors.textMuted,
@@ -381,23 +601,30 @@ const styles = StyleSheet.create({
   },
   modalScrim: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
     backgroundColor: colors.surface,
     padding: spacing.xl,
-    borderTopLeftRadius: radii.xl,
-    borderTopRightRadius: radii.xl,
+    borderTopLeftRadius: radii.lg,
+    borderTopRightRadius: radii.lg,
     gap: spacing.md,
   },
-  modalTitle: { fontSize: fontSizes.lg, fontWeight: '700', color: colors.text },
-  modalBody: { fontSize: fontSizes.sm, color: colors.textMuted },
+  savedModalSheet: {
+    backgroundColor: colors.surface,
+    margin: spacing.lg,
+    padding: spacing.lg,
+    borderRadius: radii.lg,
+    gap: spacing.md,
+  },
+  modalTitle: { fontSize: fontSizes.lg, fontWeight: '500', color: colors.text },
+  modalBody: { fontSize: fontSizes.sm, color: colors.textMuted, lineHeight: 20 },
   manualInput: {
     minHeight: 100,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    borderRadius: radii.md,
+    borderRadius: radii.sm,
     padding: spacing.md,
     color: colors.text,
     backgroundColor: colors.bg,

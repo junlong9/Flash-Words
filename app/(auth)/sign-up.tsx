@@ -24,14 +24,12 @@ export default function SignUpScreen() {
     setSubmitting(true);
     try {
       await signUp(email.trim(), password, displayName.trim() || undefined);
-      // Try sign-in immediately. With email confirmation enabled this will
-      // throw a clear error and we display it.
       try {
         await signIn(email.trim(), password);
       } catch {
         Alert.alert(
           'Almost there',
-          'Check your email to confirm your account, then come back and sign in.'
+          'Check your email to confirm your account, then sign in.'
         );
       }
     } catch (err: any) {
@@ -45,16 +43,16 @@ export default function SignUpScreen() {
     <Screen>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.hero}>
-          <Text style={styles.brand}>Plant your first word</Text>
-          <Text style={styles.tagline}>It only takes a moment.</Text>
+          <Text style={styles.brand}>Create account</Text>
+          <Text style={styles.tagline}>Start with your first word.</Text>
         </View>
 
         <TextField
-          label="Display name (optional)"
+          label="Name"
           autoCapitalize="words"
           value={displayName}
           onChangeText={setDisplayName}
-          placeholder="Alex"
+          placeholder="Optional"
         />
         <TextField
           label="Email"
@@ -79,7 +77,7 @@ export default function SignUpScreen() {
         <Button title="Create account" onPress={onSubmit} loading={submitting} />
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Already have an account?</Text>
+          <Text style={styles.footerText}>Have an account?</Text>
           <Link href="/(auth)/sign-in" style={styles.link}>
             Sign in
           </Link>
@@ -90,19 +88,18 @@ export default function SignUpScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: { alignItems: 'center', marginBottom: spacing.xxl, marginTop: spacing.xl },
+  hero: { marginBottom: spacing.xxl, marginTop: spacing.xl },
   brand: {
     fontSize: fontSizes.xxl,
-    fontWeight: '800',
+    fontWeight: '400',
     color: colors.primaryDark,
-    textAlign: 'center',
+    letterSpacing: -0.3,
   },
-  tagline: { fontSize: fontSizes.md, color: colors.textMuted, marginTop: spacing.sm },
+  tagline: { fontSize: fontSizes.sm, color: colors.textMuted, marginTop: spacing.sm },
   error: {
     color: colors.danger,
     fontSize: fontSizes.sm,
     marginBottom: spacing.md,
-    textAlign: 'center',
   },
   footer: {
     flexDirection: 'row',
@@ -111,6 +108,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
     gap: spacing.sm,
   },
-  footerText: { color: colors.textMuted },
-  link: { color: colors.primary, fontWeight: '600' },
+  footerText: { color: colors.textMuted, fontSize: fontSizes.sm },
+  link: { color: colors.primary, fontWeight: '500', fontSize: fontSizes.sm },
 });

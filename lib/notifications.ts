@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-const SCHEDULED_KEY = 'wordflash:dailyReminderId';
+const SCHEDULED_KEY = 'lotus:dailyReminderId';
 const REMINDER_HOUR = 20; // 8 PM local
 const REMINDER_MINUTE = 0;
 
@@ -40,8 +40,8 @@ export async function scheduleDailyReminder(): Promise<boolean> {
 
   const id = await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'Water your plant 🌱',
-      body: 'Don’t break your streak — log a word before midnight!',
+      title: 'Water your plant',
+      body: "Don't break your streak — log a word before midnight.",
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.CALENDAR,

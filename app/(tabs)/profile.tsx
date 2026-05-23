@@ -10,7 +10,7 @@ import {
   cancelDailyReminder,
   getNotificationStatus,
 } from '@/lib/notifications';
-import { colors, fontSizes, radii, spacing } from '@/theme/colors';
+import { colors, fontSizes, spacing } from '@/theme/colors';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
@@ -43,7 +43,7 @@ export default function ProfileScreen() {
     if (value) {
       const ok = await scheduleDailyReminder();
       if (!ok) {
-        Alert.alert('Permission needed', 'Allow notifications in Settings to enable daily reminders.');
+        Alert.alert('Permission needed', 'Allow notifications in Settings.');
         return;
       }
       setReminderOn(true);
@@ -56,7 +56,7 @@ export default function ProfileScreen() {
   }
 
   return (
-    <Screen>
+    <Screen hasTabBar>
       <Text style={styles.title}>Profile</Text>
       <Text style={styles.email}>{user?.email}</Text>
 
@@ -72,9 +72,7 @@ export default function ProfileScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.rowTitle}>Premium</Text>
             <Text style={styles.rowSub}>
-              {profile?.is_premium
-                ? 'Unlimited cards · Rare plants · No ads'
-                : '1 card/day · Basic plants · Ad-supported'}
+              {profile?.is_premium ? 'Unlimited cards' : 'One card per day'}
             </Text>
           </View>
           <Switch
@@ -84,20 +82,14 @@ export default function ProfileScreen() {
             thumbColor="#fff"
           />
         </View>
-        <Text style={styles.note}>
-          (Stub) The premium toggle just flips a flag in your profile for now. Real in-app
-          purchases will be wired in later.
-        </Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Daily reminder</Text>
+        <Text style={styles.sectionTitle}>Reminders</Text>
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.rowTitle}>Evening reminder</Text>
-            <Text style={styles.rowSub}>
-              Pings you at 8:00 PM if you haven't watered your plant yet.
-            </Text>
+            <Text style={styles.rowTitle}>Daily reminder</Text>
+            <Text style={styles.rowSub}>8:00 PM local time</Text>
           </View>
           <Switch
             value={reminderOn}
@@ -126,38 +118,56 @@ function Stat({ label, value }: { label: string; value: number }) {
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: fontSizes.xxl, fontWeight: '800', color: colors.text },
-  email: { color: colors.textMuted, marginTop: 2, marginBottom: spacing.lg },
+  title: {
+    fontSize: fontSizes.xl,
+    fontWeight: '500',
+    color: colors.primaryDark,
+    letterSpacing: -0.3,
+  },
+  email: {
+    color: colors.textMuted,
+    marginTop: 2,
+    marginBottom: spacing.lg,
+    fontSize: fontSizes.sm,
+  },
   statRow: {
     flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.md,
-    borderWidth: 1,
+    paddingVertical: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
   },
   stat: { flex: 1, alignItems: 'center' },
-  statValue: { fontSize: fontSizes.xxl, fontWeight: '800', color: colors.primaryDark },
-  statLabel: { color: colors.textMuted, fontSize: fontSizes.xs, marginTop: 2 },
+  statValue: {
+    fontSize: fontSizes.xl,
+    fontWeight: '300',
+    color: colors.primaryDark,
+    letterSpacing: -0.5,
+  },
+  statLabel: {
+    color: colors.textMuted,
+    fontSize: fontSizes.xs,
+    marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   section: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.lg,
+    paddingVertical: spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    marginBottom: spacing.md,
     gap: spacing.md,
   },
   sectionTitle: {
-    fontSize: fontSizes.sm,
-    fontWeight: '700',
+    fontSize: fontSizes.xs,
+    fontWeight: '500',
     color: colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  rowTitle: { fontSize: fontSizes.md, fontWeight: '600', color: colors.text },
+  rowTitle: { fontSize: fontSizes.md, fontWeight: '500', color: colors.text },
   rowSub: { fontSize: fontSizes.xs, color: colors.textMuted, marginTop: 2 },
-  note: { fontSize: fontSizes.xs, color: colors.textMuted, fontStyle: 'italic' },
+  note: { fontSize: fontSizes.xs, color: colors.textMuted },
 });

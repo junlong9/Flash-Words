@@ -1,5 +1,5 @@
 -- =====================================================================
--- Word Flash — Supabase schema
+-- Lotus - Supabase schema
 -- Run this in the Supabase SQL editor (Project → SQL → New query → Run).
 -- Idempotent: safe to re-run.
 -- =====================================================================
@@ -20,6 +20,7 @@ create table if not exists public.profiles (
   longest_streak int not null default 0,
   last_logged_date date,            -- in user's local tz
   total_words int not null default 0,
+  plant_growth_xp numeric(10,2) not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -68,12 +69,20 @@ create table if not exists public.flashcards (
   source text not null default 'dictionary_api',    -- dictionary_api | manual | featured
   is_manual boolean not null default false,
   logged_date date not null,                        -- local-tz date
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  repetitions int not null default 0,
+  interval_days int not null default 0,
+  ease_factor numeric(4,2) not null default 2.5,
+  next_review_date date,
+  last_reviewed_at timestamptz
 );
 
 -- Helpful indexes
 create index if not exists flashcards_user_date_idx
   on public.flashcards (user_id, logged_date desc);
+
+create index if not exists flashcards_user_review_idx
+  on public.flashcards (user_id, next_review_date);
 
 create index if not exists flashcards_user_word_idx
   on public.flashcards (user_id, lower(word));
