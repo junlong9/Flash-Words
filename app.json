@@ -1,15 +1,18 @@
 {
   "expo": {
-    "name": "wordflash",
+    "name": "Word Flash",
     "slug": "wordflash",
+    "scheme": "wordflash",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.wordflash.app"
     },
     "android": {
+      "package": "com.wordflash.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -19,7 +22,20 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "color": "#3FB68B"
+        }
+      ]
+    ],
+    "extra": {
+      "router": {}
     }
   }
 }
